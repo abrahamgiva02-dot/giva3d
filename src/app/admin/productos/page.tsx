@@ -45,7 +45,7 @@ export default function AdminProductsPage() {
     setIsLoadingDb(true);
     try {
       const dbItems = await fetchProducts();
-      if (dbItems && dbItems.length > 0) {
+      if (dbItems) {
         setProducts(dbItems);
       }
     } catch (err) {

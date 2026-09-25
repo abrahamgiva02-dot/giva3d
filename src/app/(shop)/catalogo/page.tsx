@@ -7,36 +7,44 @@ import { Search, SlidersHorizontal, Layers, X, Sparkles, Filter } from 'lucide-r
 import { useCatalogStore } from '@/lib/store/catalog-store';
 import ProductCard from '@/components/product/ProductCard';
 import { fetchActiveProducts } from '@/lib/services/products';
-import { isSupabaseConfigured } from '@/lib/supabase';
+import { Product } from '@/types';
 
 function CatalogContent() {
   const searchParams = useSearchParams();
   const initialQuery = searchParams.get('q') || '';
 
-  const { products, categories, setProducts } = useCatalogStore();
-  const [isLoading, setIsLoading] = useState(isSupabaseConfigured);
+  const { categories } = useCatalogStore();
+  const [products, setProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
     let isMounted = true;
-    if (isSupabaseConfigured) {
-      fetchActiveProducts()
-        .then((dbItems) => {
-          if (isMounted) {
-            if (dbItems && dbItems.length > 0) {
-              setProducts(dbItems);
-            }
-            setIsLoading(false);
-          }
-        })
-        .catch((err) => {
-          console.error('[SUPABASE PRODUCTS ERROR] Catalog fetch error:', err);
-          if (isMounted) setIsLoading(false);
-        });
+
+    async function loadProducts() {
+      try {
+        const dbItems = await fetchActiveProducts();
+        if (isMounted) {
+          const count = dbItems?.length || 0;
+          console.log('[CATALOGO SUPABASE PRODUCTS]', count);
+          setProducts(dbItems || []);
+          setIsLoading(false);
+        }
+      } catch (err) {
+        console.error('[CATALOGO SUPABASE PRODUCTS ERROR]', err);
+        if (isMounted) {
+          console.log('[CATALOGO SUPABASE PRODUCTS]', 0);
+          setProducts([]);
+          setIsLoading(false);
+        }
+      }
     }
+
+    loadProducts();
+
     return () => {
       isMounted = false;
     };
-  }, [setProducts]);
+  }, []);
 
   const [search, setSearch] = useState(initialQuery);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -230,24 +238,37 @@ function CatalogContent() {
       </div>
 
       {/* Product Results Grid */}
-      {filteredProducts.length === 0 ? (
+      {isLoading ? (
+        <div className="bg-white rounded-3xl p-16 text-center border border-slate-200/80 text-slate-400">
+          <div className="inline-block w-6 h-6 border-2 border-purple-600 border-t-transparent rounded-full animate-spin mb-2" />
+          <p className="text-xs font-semibold">Cargando catálogo oficial desde Supabase...</p>
+        </div>
+      ) : filteredProducts.length === 0 ? (
         <div className="bg-white rounded-3xl p-12 text-center border border-slate-200/80">
           <Layers className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-          <h3 className="text-lg font-bold text-slate-800">No encontramos productos con los filtros seleccionados</h3>
+          <h3 className="text-lg font-bold text-slate-800">
+            {products.length === 0
+              ? 'No hay productos disponibles por el momento'
+              : 'No encontramos productos con los filtros seleccionados'}
+          </h3>
           <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto mb-6">
-            Intenta cambiar los términos de búsqueda o restablecer los filtros de categoría.
+            {products.length === 0
+              ? 'Estamos preparando y publicando nuevas piezas en el catálogo oficial.'
+              : 'Intenta cambiar los términos de búsqueda o restablecer los filtros de categoría.'}
           </p>
-          <button
-            type="button"
-            onClick={() => {
-              setSearch('');
-              setSelectedCategory('all');
-              setSelectedTag('all');
-            }}
-            className="px-5 py-2.5 rounded-full bg-slate-900 text-white text-xs font-bold hover:bg-purple-700 transition-colors"
-          >
-            Restablecer todos los filtros
-          </button>
+          {products.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearch('');
+                setSelectedCategory('all');
+                setSelectedTag('all');
+              }}
+              className="px-5 py-2.5 rounded-full bg-slate-900 text-white text-xs font-bold hover:bg-purple-700 transition-colors"
+            >
+              Restablecer todos los filtros
+            </button>
+          )}
         </div>
       ) : (
         <div>

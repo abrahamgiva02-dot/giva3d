@@ -18,7 +18,6 @@ import {
   Sparkles,
   ArrowLeft
 } from 'lucide-react';
-import { useCatalogStore } from '@/lib/store/catalog-store';
 import { useCartStore } from '@/lib/store/cart';
 import { calculateUnitPrice, formatCurrency } from '@/lib/pricing';
 import { buildWhatsAppProductInquiryUrl } from '@/lib/config';
@@ -28,7 +27,6 @@ import { normalizeSlug, slugify } from '@/lib/slug';
 import { Product, ProductColor } from '@/types';
 
 import { fetchProductBySlug, fetchActiveProducts } from '@/lib/services/products';
-import { isSupabaseConfigured } from '@/lib/supabase';
 
 export default function ProductDetailPage() {
   const params = useParams();
@@ -36,58 +34,56 @@ export default function ProductDetailPage() {
   const rawSlug = params?.slug as string;
   const targetSlug = normalizeSlug(rawSlug);
 
-  const { products, setProducts, isHydrated } = useCatalogStore();
   const { addItem } = useCartStore();
 
-  const [dbProduct, setDbProduct] = useState<Product | null>(null);
-  const [isLoadingDb, setIsLoadingDb] = useState<boolean>(isSupabaseConfigured);
+  const [product, setProduct] = useState<Product | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
 
-  const productFromStore = useMemo(() => {
-    if (!targetSlug && !rawSlug) return undefined;
-
-    // 1. Exact match on slug
-    const directMatch = products.find((p) => p.slug === targetSlug || p.slug === rawSlug);
-    if (directMatch) return directMatch;
-
-    // 2. Normalized match
-    const normalizedMatch = products.find(
-      (p) => slugify(p.slug) === targetSlug || slugify(p.name) === targetSlug
-    );
-    if (normalizedMatch) return normalizedMatch;
-
-    // 3. Fallback: match by ID
-    const idMatch = products.find((p) => p.id === rawSlug || p.id === targetSlug);
-    if (idMatch) return idMatch;
-
-    return undefined;
-  }, [products, targetSlug, rawSlug]);
-
-  // Fetch product from Supabase if not yet in store or directly accessed
+  // Fetch product and related products strictly from Supabase
   React.useEffect(() => {
     let isMounted = true;
-    if (isSupabaseConfigured) {
-      fetchProductBySlug(targetSlug || rawSlug)
-        .then((fetched) => {
+
+    async function loadProductDetail() {
+      setIsLoading(true);
+      try {
+        const querySlug = targetSlug || rawSlug;
+        const fetched = await fetchProductBySlug(querySlug);
+        
+        if (isMounted) {
+          setProduct(fetched);
+          setIsLoading(false);
+        }
+
+        if (fetched) {
+          const allActive = await fetchActiveProducts();
           if (isMounted) {
-            if (fetched) {
-              setDbProduct(fetched);
-            }
-            setIsLoadingDb(false);
+            const rel = allActive
+              .filter(
+                (p) =>
+                  (p.categorySlug === fetched.categorySlug || p.categoryId === fetched.categoryId) &&
+                  p.id !== fetched.id &&
+                  p.isActive
+              )
+              .slice(0, 6);
+            setRelatedProducts(rel);
           }
-        })
-        .catch((err) => {
-          console.error('[SUPABASE PRODUCTS ERROR] ProductDetailPage fetch error:', err);
-          if (isMounted) setIsLoadingDb(false);
-        });
-    } else {
-      setIsLoadingDb(false);
+        }
+      } catch (err) {
+        console.error('[SUPABASE PRODUCT DETAIL ERROR]', err);
+        if (isMounted) {
+          setProduct(null);
+          setIsLoading(false);
+        }
+      }
     }
+
+    loadProductDetail();
+
     return () => {
       isMounted = false;
     };
   }, [targetSlug, rawSlug]);
-
-  const product = productFromStore || dbProduct;
 
   // If the product was found but the current URL had spaces or was unnormalized, silently replace URL to clean canonical slug
   React.useEffect(() => {
@@ -111,11 +107,11 @@ export default function ProductDetailPage() {
     }
   }, [product]);
 
-  if (isLoadingDb && !product) {
+  if (isLoading) {
     return (
-      <div className="max-w-7xl mx-auto px-4 py-20 text-center text-slate-400">
+      <div className="max-w-7xl mx-auto px-4 py-24 text-center text-slate-400">
         <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-        <p className="text-sm font-medium">Cargando producto desde catálogo...</p>
+        <p className="text-sm font-semibold">Cargando producto oficial desde Supabase...</p>
       </div>
     );
   }
@@ -124,7 +120,7 @@ export default function ProductDetailPage() {
     return (
       <div className="max-w-7xl mx-auto px-4 py-20 text-center">
         <h2 className="text-2xl font-bold text-slate-800 mb-2">Producto no encontrado</h2>
-        <p className="text-slate-500 mb-6">El producto que buscas no existe o ha sido retirado.</p>
+        <p className="text-slate-500 mb-6">El producto que buscas no existe o ha sido retirado del catálogo.</p>
         <Link
           href="/catalogo"
           className="px-6 py-2.5 rounded-full bg-slate-900 text-white font-bold text-sm hover:bg-purple-700 transition-colors"
@@ -153,11 +149,6 @@ export default function ProductDetailPage() {
   };
 
   const inquiryUrl = buildWhatsAppProductInquiryUrl(product.name, selectedColor);
-
-  // Related products
-  const relatedProducts = products
-    .filter((p) => p.categoryId === product.categoryId && p.id !== product.id && p.isActive)
-    .slice(0, 6);
 
   return (
     <div className="max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-5 sm:py-8">

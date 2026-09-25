@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { Product, Banner, Category } from '@/types';
-import { INITIAL_PRODUCTS } from '../data/products';
 import { INITIAL_BANNERS } from '../data/banners';
 import { INITIAL_CATEGORIES } from '../data/categories';
 import { slugify } from '../slug';
@@ -35,10 +34,7 @@ interface CatalogStore {
 export const useCatalogStore = create<CatalogStore>()(
   persist(
     (set, get) => ({
-      products: INITIAL_PRODUCTS.map((p) => ({
-        ...p,
-        slug: slugify(p.slug || p.name),
-      })),
+      products: [],
       banners: INITIAL_BANNERS,
       categories: INITIAL_CATEGORIES,
       isHydrated: false,
@@ -147,7 +143,7 @@ export const useCatalogStore = create<CatalogStore>()(
           }
         }
         set({
-          products: INITIAL_PRODUCTS,
+          products: [],
           banners: INITIAL_BANNERS,
           categories: INITIAL_CATEGORIES,
         });
@@ -167,7 +163,6 @@ export const useCatalogStore = create<CatalogStore>()(
           try {
             localStorage.setItem(name, value);
           } catch (e: any) {
-            // If quota is exceeded (e.g. leftover data or legacy items), clear and retry safely
             if (e?.name === 'QuotaExceededError' || e?.code === 22 || e?.number === -2147024882) {
               console.warn('[GIVA 3D] localStorage quota exceeded. Purging giva3d-catalog-storage to recover...');
               try {
@@ -186,26 +181,8 @@ export const useCatalogStore = create<CatalogStore>()(
           }
         },
       })),
+      // DO NOT persist products to localStorage. Products strictly come from Supabase.
       partialize: (state) => ({
-        // Strip any base64, blob or temporary data before saving to localStorage, and ensure all slugs are clean
-        products: state.products.map((p) => ({
-          ...p,
-          slug: slugify(p.slug || p.name),
-          categorySlug: slugify(p.categorySlug || ''),
-          // Only keep string URLs (e.g. Supabase Storage URL or Unsplash URL), never data: URLs
-          primaryImage: (p.primaryImage && !p.primaryImage.startsWith('data:')) ? p.primaryImage : '',
-          images: (p.images || []).filter((img) => !img.startsWith('data:')),
-          productImages: (p.productImages || [])
-            .filter((pi) => !pi.imageUrl.startsWith('data:'))
-            .map((pi) => ({
-              id: pi.id,
-              productId: pi.productId,
-              imageUrl: pi.imageUrl,
-              storagePath: pi.storagePath,
-              isPrimary: pi.isPrimary,
-              sortOrder: pi.sortOrder,
-            })),
-        })),
         banners: state.banners.map((b) => ({
           ...b,
           imageUrl: b.imageUrl?.startsWith('data:') ? '' : b.imageUrl,
@@ -214,29 +191,22 @@ export const useCatalogStore = create<CatalogStore>()(
         categories: state.categories,
       }),
       onRehydrateStorage: () => (state) => {
-        // Auto-cleanup any corrupted or oversized legacy localStorage state on startup
+        if (state) {
+          // Guarantee that hydrated state never contains legacy demo products
+          state.products = [];
+          state.setHydrated(true);
+        }
         if (typeof window !== 'undefined') {
           try {
             const raw = localStorage.getItem('giva3d-catalog-storage');
-            if (raw && (raw.includes('data:image') || raw.length > 500000)) {
-              console.warn('[GIVA 3D] Detected oversized base64 data in localStorage. Cleaning up...');
+            if (raw && (raw.includes('dragon-articulado') || raw.includes('lagartija-articulada') || raw.includes('data:image') || raw.length > 500000)) {
+              console.warn('[GIVA 3D] Cleaning legacy demo products from localStorage...');
               localStorage.removeItem('giva3d-catalog-storage');
             }
-          } catch (e) {
-            console.error('[GIVA 3D] Error reading or cleaning storage:', e);
+          } catch {
+            // ignore
           }
         }
-
-        // Normalize all product slugs in memory after rehydration from localStorage
-        if (state && state.products) {
-          state.products = state.products.map((p) => ({
-            ...p,
-            slug: slugify(p.slug || p.name),
-            categorySlug: slugify(p.categorySlug || ''),
-          }));
-        }
-
-        state?.setHydrated(true);
       },
     }
   )

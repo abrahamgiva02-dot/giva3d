@@ -9,33 +9,43 @@ import ProductCard from '@/components/product/ProductCard';
 import { buildWhatsAppCustomQuoteUrl } from '@/lib/config';
 import { normalizeSlug, slugify } from '@/lib/slug';
 import { fetchActiveProducts } from '@/lib/services/products';
-import { isSupabaseConfigured } from '@/lib/supabase';
+import { Product } from '@/types';
 
 export default function CategoryPage() {
   const params = useParams();
   const rawSlug = params?.slug as string;
   const slug = normalizeSlug(rawSlug);
 
-  const { categories, products, setProducts } = useCatalogStore();
+  const { categories } = useCatalogStore();
+  const [products, setProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [sortBy, setSortBy] = useState<'default' | 'price-asc' | 'price-desc' | 'name'>('default');
 
   useEffect(() => {
     let isMounted = true;
-    if (isSupabaseConfigured) {
-      fetchActiveProducts()
-        .then((dbItems) => {
-          if (isMounted && dbItems && dbItems.length > 0) {
-            setProducts(dbItems);
-          }
-        })
-        .catch((err) => {
-          console.error('[SUPABASE PRODUCTS ERROR] Category page fetch error:', err);
-        });
+
+    async function loadCategoryProducts() {
+      try {
+        const dbItems = await fetchActiveProducts();
+        if (isMounted) {
+          setProducts(dbItems || []);
+          setIsLoading(false);
+        }
+      } catch (err) {
+        console.error('[SUPABASE PRODUCTS ERROR] Category page fetch error:', err);
+        if (isMounted) {
+          setProducts([]);
+          setIsLoading(false);
+        }
+      }
     }
+
+    loadCategoryProducts();
+
     return () => {
       isMounted = false;
     };
-  }, [setProducts]);
+  }, []);
 
   const category = useMemo(() => {
     return categories.find((c) => slugify(c.slug) === slug || c.slug === slug || c.slug === rawSlug);
@@ -243,7 +253,12 @@ export default function CategoryPage() {
       </div>
 
       {/* Products Grid */}
-      {categoryProducts.length === 0 ? (
+      {isLoading ? (
+        <div className="bg-white rounded-3xl p-16 text-center border border-slate-200/80 text-slate-400">
+          <div className="inline-block w-6 h-6 border-2 border-purple-600 border-t-transparent rounded-full animate-spin mb-2" />
+          <p className="text-xs font-semibold">Cargando productos de la categoría desde Supabase...</p>
+        </div>
+      ) : categoryProducts.length === 0 ? (
         <div className="bg-white rounded-3xl p-12 text-center border border-slate-200/80">
           <Layers className="w-12 h-12 text-slate-300 mx-auto mb-3" />
           <h3 className="text-lg font-bold text-slate-800">No hay productos en esta categoría por el momento</h3>
