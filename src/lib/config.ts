@@ -6,8 +6,8 @@ export const SITE_CONFIG = {
   tagline: 'Impresión 3D profesional y trabajos personalizados',
   description: 'Catálogo profesional de productos en 3D, figuras articuladas, regalos personalizados, piezas industriales y servicio de diseño a medida.',
   currency: 'S/',
-  whatsappNumber: '51987654321', // Reemplazar con el número oficial de GIVA 3D
-  whatsappDisplay: '+51 987 654 321',
+  whatsappNumber: '51907882064',
+  whatsappDisplay: '+51 907 882 064',
   email: 'contacto@giva3d.com',
   location: 'Lima, Perú',
   shippingInfo: 'Envíos a todo el Perú y entregas coordinadas',
