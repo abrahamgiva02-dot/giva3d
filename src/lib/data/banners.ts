@@ -1,0 +1,48 @@
+import { Banner } from '@/types';
+
+export const INITIAL_BANNERS: Banner[] = [
+  {
+    id: 'banner-1',
+    title: 'OFERTA — Lagartijas y Animales Articulados 3D',
+    subtitle: 'Texturas realistas, movimiento fluido y colores vibrantes. ¡Desde S/ 4.00 c/u por mayor!',
+    badge: 'OFERTA ESPECIAL',
+    imageUrl: 'https://images.unsplash.com/photo-1563245372-f21724e3856d?auto=format&fit=crop&w=1400&q=80',
+    buttonText: 'Ver Articulados',
+    linkUrl: '/categoria/juguetes-figuras',
+    displayOrder: 1,
+    isActive: true,
+  },
+  {
+    id: 'banner-2',
+    title: 'Precios Mayoristas desde 6, 12 y 24 unidades',
+    subtitle: 'Ahorra en cada producto llevando por cantidad. Ideal para reventa, eventos y corporativos.',
+    badge: 'MAYORISTA GIVA 3D',
+    imageUrl: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=1400&q=80',
+    buttonText: 'Ver Catálogo Completo',
+    linkUrl: '/catalogo',
+    displayOrder: 2,
+    isActive: true,
+  },
+  {
+    id: 'banner-3',
+    title: '¿Se rompió una pieza? ¡Fabricamos tu repuesto a medida!',
+    subtitle: 'Envíanos fotos, medidas o archivo 3D de autos, motos, máquinas o electrodomésticos.',
+    badge: 'DISEÑO A MEDIDA',
+    imageUrl: 'https://images.unsplash.com/photo-1581092335397-9583fe92d232?auto=format&fit=crop&w=1400&q=80',
+    buttonText: 'Solicitar Cotización',
+    linkUrl: '/categoria/diseno-a-medida',
+    displayOrder: 3,
+    isActive: true,
+  },
+  {
+    id: 'banner-4',
+    title: 'Logos 3D y Letreros Personalizados para tu Negocio',
+    subtitle: 'Dale presencia profesional a tu marca con placas en relieve y acabados de alta definición.',
+    badge: 'EMPRESAS Y MARCAS',
+    imageUrl: 'https://images.unsplash.com/photo-1626785774573-4b799315345d?auto=format&fit=crop&w=1400&q=80',
+    buttonText: 'Personalizar Ahora',
+    linkUrl: '/categoria/logos-personalizados',
+    displayOrder: 4,
+    isActive: true,
+  },
+];
