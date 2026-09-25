@@ -16,19 +16,48 @@ import {
   X,
   ExternalLink,
   Filter,
-  RotateCcw
+  RotateCcw,
+  UploadCloud
 } from 'lucide-react';
 import { useCatalogStore } from '@/lib/store/catalog-store';
 import { formatCurrency } from '@/lib/pricing';
 import { slugify } from '@/lib/slug';
+import { 
+  fetchProducts, 
+  deleteProductFromDb, 
+  toggleProductActiveInDb 
+} from '@/lib/services/products';
+import { isSupabaseConfigured } from '@/lib/supabase';
+import ProductMigrationModal from '@/components/admin/ProductMigrationModal';
 
 export default function AdminProductsPage() {
-  const { products, categories, toggleProductActive, deleteProduct, resetToDefaults } = useCatalogStore();
+  const { products, categories, setProducts, toggleProductActive, deleteProduct, resetToDefaults } = useCatalogStore();
 
+  const [isLoadingDb, setIsLoadingDb] = useState(false);
+  const [isMigrationModalOpen, setIsMigrationModalOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'published' | 'hidden'>('all');
   const [actionSuccess, setActionSuccess] = useState('');
+
+  const loadDbProducts = React.useCallback(async () => {
+    if (!isSupabaseConfigured) return;
+    setIsLoadingDb(true);
+    try {
+      const dbItems = await fetchProducts();
+      if (dbItems && dbItems.length > 0) {
+        setProducts(dbItems);
+      }
+    } catch (err) {
+      console.error('[SUPABASE PRODUCTS ERROR] AdminProductsPage load error:', err);
+    } finally {
+      setIsLoadingDb(false);
+    }
+  }, [setProducts]);
+
+  React.useEffect(() => {
+    loadDbProducts();
+  }, [loadDbProducts]);
 
   const showToast = (msg: string) => {
     setActionSuccess(msg);
@@ -52,14 +81,28 @@ export default function AdminProductsPage() {
     });
   }, [products, search, selectedCategory, statusFilter]);
 
-  const handleToggleActive = (id: string, currentActive: boolean) => {
+  const handleToggleActive = async (id: string, currentActive: boolean) => {
     toggleProductActive(id);
+    if (isSupabaseConfigured) {
+      try {
+        await toggleProductActiveInDb(id, currentActive);
+      } catch (err: any) {
+        console.warn('[SUPABASE PRODUCTS] Toggle error in DB:', err.message);
+      }
+    }
     showToast(currentActive ? 'Producto ocultado del catálogo' : 'Producto publicado en el catálogo');
   };
 
-  const handleDelete = (id: string, name: string) => {
+  const handleDelete = async (id: string, name: string) => {
     if (window.confirm(`¿Estás seguro de eliminar "${name}"? Esta acción no se puede deshacer.`)) {
       deleteProduct(id);
+      if (isSupabaseConfigured) {
+        try {
+          await deleteProductFromDb(id);
+        } catch (err: any) {
+          console.warn('[SUPABASE PRODUCTS] Delete error in DB:', err.message);
+        }
+      }
       showToast('Producto eliminado exitosamente');
     }
   };
@@ -82,6 +125,20 @@ export default function AdminProductsPage() {
           <button
             type="button"
             onClick={() => {
+              loadDbProducts();
+              showToast('Catálogo actualizado desde Supabase');
+            }}
+            disabled={isLoadingDb}
+            className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs transition-colors shadow-xs disabled:opacity-50"
+            title="Recargar catálogo directamente desde Supabase"
+          >
+            <RotateCcw className={`w-3.5 h-3.5 ${isLoadingDb ? 'animate-spin text-purple-600' : ''}`} />
+            <span>{isLoadingDb ? 'Cargando...' : 'Recargar'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
               if (window.confirm('¿Deseas restablecer los productos por defecto y limpiar datos residuales locales?')) {
                 resetToDefaults();
                 showToast('Catálogo restablecido correctamente');
@@ -94,6 +151,17 @@ export default function AdminProductsPage() {
             <span>Restablecer</span>
           </button>
 
+          {/* Temporal Migration Button */}
+          <button
+            type="button"
+            onClick={() => setIsMigrationModalOpen(true)}
+            className="flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs sm:text-sm shadow-md shadow-amber-500/20 transition-all hover:scale-105 active:scale-95"
+            title="Migrar productos guardados en localStorage hacia Supabase"
+          >
+            <UploadCloud className="w-4 h-4 text-slate-950" />
+            <span>Migrar productos locales a Supabase</span>
+          </button>
+
           <Link
             href="/admin/productos/nuevo"
             className="flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-gradient-brand text-white font-bold text-xs sm:text-sm shadow-md shadow-purple-600/25 hover:opacity-95 transition-all self-start sm:self-auto"
@@ -103,6 +171,15 @@ export default function AdminProductsPage() {
           </Link>
         </div>
       </div>
+
+      {/* Migration Modal */}
+      <ProductMigrationModal
+        isOpen={isMigrationModalOpen}
+        onClose={() => setIsMigrationModalOpen(false)}
+        onMigrationComplete={() => {
+          loadDbProducts();
+        }}
+      />
 
       {/* Toast notification */}
       {actionSuccess && (

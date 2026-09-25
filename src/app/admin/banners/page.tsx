@@ -116,17 +116,17 @@ export default function AdminBannersPage() {
     try {
       if (isSupabaseConfigured) {
         const dbItems = await fetchBanners();
-        if (dbItems && dbItems.length > 0) {
+        if (dbItems) {
           setBanners(dbItems);
           setStoreBanners(dbItems);
         } else {
-          setBanners(storeBanners);
+          setBanners([]);
         }
       } else {
         setBanners(storeBanners);
       }
     } catch (err: any) {
-      console.warn('Error fetching banners:', err);
+      console.error('[SUPABASE BANNERS ERROR] loadBanners failed:', err);
       setBanners(storeBanners);
       showToast('No se pudieron sincronizar los banners de la base de datos', 'error');
     } finally {

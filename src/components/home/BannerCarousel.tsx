@@ -4,25 +4,37 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ChevronLeft, ChevronRight, Sparkles, ArrowRight } from 'lucide-react';
-import { useCatalogStore } from '@/lib/store/catalog-store';
 import { fetchActiveBanners } from '@/lib/services/banners';
-import { INITIAL_BANNERS } from '@/lib/data/banners';
 import { Banner } from '@/types';
 
-export default function BannerCarousel() {
-  const { banners } = useCatalogStore();
-  const [dbBanners, setDbBanners] = useState<Banner[] | null>(null);
+interface BannerCarouselProps {
+  initialBanners?: Banner[];
+}
+
+export default function BannerCarousel({ initialBanners }: BannerCarouselProps = {}) {
+  const [dbBanners, setDbBanners] = useState<Banner[] | null>(
+    initialBanners && initialBanners.length > 0 ? initialBanners : null
+  );
+  const [isLoading, setIsLoading] = useState<boolean>(!initialBanners || initialBanners.length === 0);
 
   useEffect(() => {
     let isMounted = true;
     fetchActiveBanners()
       .then((items) => {
-        if (isMounted && items && items.length > 0) {
-          setDbBanners(items);
+        if (isMounted) {
+          if (items && items.length > 0) {
+            setDbBanners(items);
+          } else {
+            setDbBanners([]);
+          }
+          setIsLoading(false);
         }
       })
       .catch((err) => {
-        console.warn('Could not fetch active banners from DB:', err);
+        console.error('[SUPABASE BANNERS ERROR] BannerCarousel fetch failed:', err);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       });
 
     return () => {
@@ -30,13 +42,7 @@ export default function BannerCarousel() {
     };
   }, []);
 
-  const storeActive = banners
-    .filter((b) => b.isActive)
-    .sort((a, b) => a.displayOrder - b.displayOrder);
-
-  const activeBanners = (dbBanners && dbBanners.length > 0)
-    ? dbBanners
-    : (storeActive.length > 0 ? storeActive : INITIAL_BANNERS.filter((b) => b.isActive));
+  const activeBanners = dbBanners || [];
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
@@ -57,6 +63,21 @@ export default function BannerCarousel() {
     return () => clearInterval(interval);
   }, [isPaused, nextSlide, activeBanners.length]);
 
+  // Loading skeleton while waiting for DB banners
+  if (isLoading && activeBanners.length === 0) {
+    return (
+      <section className="relative w-full max-w-[1720px] mx-auto px-3 sm:px-6 lg:px-8 xl:px-10 pt-2 sm:pt-4">
+        <div className="relative w-full rounded-3xl overflow-hidden bg-slate-900 border border-slate-800 min-h-[320px] h-[340px] sm:h-[400px] lg:h-[480px] xl:h-[500px] animate-pulse flex items-center justify-center">
+          <div className="flex flex-col items-center gap-3 text-slate-500">
+            <Sparkles className="w-8 h-8 text-purple-500 animate-spin" />
+            <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Cargando ofertas...</span>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  // If no banners in DB, do not render or show empty state
   if (activeBanners.length === 0) {
     return null;
   }

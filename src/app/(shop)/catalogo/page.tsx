@@ -1,17 +1,42 @@
 'use client';
 
-import React, { useState, useMemo, Suspense } from 'react';
+import React, { useState, useMemo, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Search, SlidersHorizontal, Layers, X, Sparkles, Filter } from 'lucide-react';
 import { useCatalogStore } from '@/lib/store/catalog-store';
 import ProductCard from '@/components/product/ProductCard';
+import { fetchActiveProducts } from '@/lib/services/products';
+import { isSupabaseConfigured } from '@/lib/supabase';
 
 function CatalogContent() {
   const searchParams = useSearchParams();
   const initialQuery = searchParams.get('q') || '';
 
-  const { products, categories } = useCatalogStore();
+  const { products, categories, setProducts } = useCatalogStore();
+  const [isLoading, setIsLoading] = useState(isSupabaseConfigured);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (isSupabaseConfigured) {
+      fetchActiveProducts()
+        .then((dbItems) => {
+          if (isMounted) {
+            if (dbItems && dbItems.length > 0) {
+              setProducts(dbItems);
+            }
+            setIsLoading(false);
+          }
+        })
+        .catch((err) => {
+          console.error('[SUPABASE PRODUCTS ERROR] Catalog fetch error:', err);
+          if (isMounted) setIsLoading(false);
+        });
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [setProducts]);
 
   const [search, setSearch] = useState(initialQuery);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');

@@ -14,7 +14,8 @@ interface CatalogStore {
   setHydrated: (val: boolean) => void;
 
   // Product Actions
-  addProduct: (product: Omit<Product, 'id'>) => Product;
+  setProducts: (products: Product[]) => void;
+  addProduct: (product: Omit<Product, 'id'> & { id?: string }) => Product;
   updateProduct: (id: string, productData: Partial<Product>) => void;
   toggleProductActive: (id: string) => void;
   deleteProduct: (id: string) => void;
@@ -44,14 +45,23 @@ export const useCatalogStore = create<CatalogStore>()(
       setHydrated: (val) => set({ isHydrated: val }),
 
       // Products
+      setProducts: (products) => {
+        set({
+          products: products.map((p) => ({
+            ...p,
+            slug: slugify(p.slug || p.name),
+            categorySlug: slugify(p.categorySlug || ''),
+          })),
+        });
+      },
       addProduct: (newProdData) => {
-        const id = `prod-${Date.now()}`;
+        const id = newProdData.id || `prod-${Date.now()}`;
         const cleanSlug = slugify(newProdData.slug || newProdData.name) || `producto-${Date.now()}`;
         const newProduct: Product = {
           ...newProdData,
           slug: cleanSlug,
           id,
-          createdAt: new Date().toISOString(),
+          createdAt: newProdData.createdAt || new Date().toISOString(),
         };
         set({ products: [newProduct, ...get().products] });
         return newProduct;

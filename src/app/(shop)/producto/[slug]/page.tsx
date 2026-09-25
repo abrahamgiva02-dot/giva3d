@@ -25,6 +25,10 @@ import { buildWhatsAppProductInquiryUrl } from '@/lib/config';
 import PriceTierTable from '@/components/product/PriceTierTable';
 import ProductCard from '@/components/product/ProductCard';
 import { normalizeSlug, slugify } from '@/lib/slug';
+import { Product, ProductColor } from '@/types';
+
+import { fetchProductBySlug, fetchActiveProducts } from '@/lib/services/products';
+import { isSupabaseConfigured } from '@/lib/supabase';
 
 export default function ProductDetailPage() {
   const params = useParams();
@@ -32,17 +36,20 @@ export default function ProductDetailPage() {
   const rawSlug = params?.slug as string;
   const targetSlug = normalizeSlug(rawSlug);
 
-  const { products, isHydrated } = useCatalogStore();
+  const { products, setProducts, isHydrated } = useCatalogStore();
   const { addItem } = useCartStore();
 
-  const product = useMemo(() => {
+  const [dbProduct, setDbProduct] = useState<Product | null>(null);
+  const [isLoadingDb, setIsLoadingDb] = useState<boolean>(isSupabaseConfigured);
+
+  const productFromStore = useMemo(() => {
     if (!targetSlug && !rawSlug) return undefined;
 
     // 1. Exact match on slug
     const directMatch = products.find((p) => p.slug === targetSlug || p.slug === rawSlug);
     if (directMatch) return directMatch;
 
-    // 2. Normalized match (in case product in store still has unnormalized slug)
+    // 2. Normalized match
     const normalizedMatch = products.find(
       (p) => slugify(p.slug) === targetSlug || slugify(p.name) === targetSlug
     );
@@ -54,6 +61,33 @@ export default function ProductDetailPage() {
 
     return undefined;
   }, [products, targetSlug, rawSlug]);
+
+  // Fetch product from Supabase if not yet in store or directly accessed
+  React.useEffect(() => {
+    let isMounted = true;
+    if (isSupabaseConfigured) {
+      fetchProductBySlug(targetSlug || rawSlug)
+        .then((fetched) => {
+          if (isMounted) {
+            if (fetched) {
+              setDbProduct(fetched);
+            }
+            setIsLoadingDb(false);
+          }
+        })
+        .catch((err) => {
+          console.error('[SUPABASE PRODUCTS ERROR] ProductDetailPage fetch error:', err);
+          if (isMounted) setIsLoadingDb(false);
+        });
+    } else {
+      setIsLoadingDb(false);
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [targetSlug, rawSlug]);
+
+  const product = productFromStore || dbProduct;
 
   // If the product was found but the current URL had spaces or was unnormalized, silently replace URL to clean canonical slug
   React.useEffect(() => {
@@ -77,11 +111,11 @@ export default function ProductDetailPage() {
     }
   }, [product]);
 
-  if (!isHydrated) {
+  if (isLoadingDb && !product) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-20 text-center text-slate-400">
         <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-        <p className="text-sm font-medium">Cargando producto...</p>
+        <p className="text-sm font-medium">Cargando producto desde catálogo...</p>
       </div>
     );
   }
@@ -166,7 +200,7 @@ export default function ProductDetailPage() {
           {/* Thumbnails */}
           {product.images && product.images.length > 1 && (
             <div className="flex items-center gap-3 overflow-x-auto pb-2">
-              {product.images.map((img, index) => (
+              {product.images.map((img: string, index: number) => (
                 <button
                   key={index}
                   type="button"
@@ -255,7 +289,7 @@ export default function ProductDetailPage() {
                   Color / Acabado: <span className="text-purple-700">{selectedColor}</span>
                 </label>
                 <div className="flex flex-wrap gap-2">
-                  {product.colors.map((c) => (
+                  {product.colors.map((c: ProductColor) => (
                     <button
                       key={c.name}
                       type="button"

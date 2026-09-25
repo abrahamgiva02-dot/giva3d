@@ -14,7 +14,8 @@ import {
   Menu, 
   X,
   ShieldCheck,
-  ChevronRight
+  ChevronRight,
+  ArchiveRestore
 } from 'lucide-react';
 import { SITE_CONFIG } from '@/lib/config';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
@@ -112,6 +113,7 @@ export default function AdminLayout({
     { label: 'Dashboard', href: '/admin', icon: <LayoutDashboard className="w-5 h-5" /> },
     { label: 'Productos', href: '/admin/productos', icon: <Package className="w-5 h-5" /> },
     { label: 'Banners Home', href: '/admin/banners', icon: <ImageIcon className="w-5 h-5" /> },
+    { label: 'Recuperar Storage', href: '/admin/recuperar-productos', icon: <ArchiveRestore className="w-5 h-5 text-amber-400" /> },
   ];
 
   return (

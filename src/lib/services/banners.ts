@@ -182,6 +182,7 @@ async function executeWithColumnFallback<T>(
  */
 export async function fetchBanners(): Promise<Banner[]> {
   if (!isSupabaseConfigured || !supabase) {
+    console.warn('[SUPABASE BANNERS] Supabase client is not configured');
     return [];
   }
 
@@ -202,14 +203,16 @@ export async function fetchBanners(): Promise<Banner[]> {
     }
 
     if (error) {
-      console.warn('Error fetching banners from Supabase:', error.message);
+      console.error('[SUPABASE BANNERS ERROR]', error.message);
       return [];
     }
 
     const mapped = (data || []).map(mapDbBannerToBanner);
-    return mapped.sort((a, b) => a.displayOrder - b.displayOrder);
-  } catch (err) {
-    console.warn('Unexpected error fetching banners:', err);
+    const sorted = mapped.sort((a, b) => a.displayOrder - b.displayOrder);
+    console.log(`[SUPABASE BANNERS] loaded ${sorted.length} banners`);
+    return sorted;
+  } catch (err: any) {
+    console.error('[SUPABASE BANNERS ERROR]', err.message || err);
     return [];
   }
 }
@@ -219,7 +222,9 @@ export async function fetchBanners(): Promise<Banner[]> {
  */
 export async function fetchActiveBanners(): Promise<Banner[]> {
   const allBanners = await fetchBanners();
-  return allBanners.filter((b) => b.isActive);
+  const active = allBanners.filter((b) => b.isActive);
+  console.log(`[SUPABASE BANNERS] loaded ${active.length} active banners for carousel`);
+  return active;
 }
 
 /**

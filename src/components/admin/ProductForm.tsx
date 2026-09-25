@@ -17,6 +17,8 @@ import { useCatalogStore } from '@/lib/store/catalog-store';
 import { slugify } from '@/lib/slug';
 import ProductImageUploader from './ProductImageUploader';
 import { uploadProductImage, deleteProductImageFromStorage } from '@/lib/services/storage';
+import { createProductInDb, updateProductInDb } from '@/lib/services/products';
+import { isSupabaseConfigured } from '@/lib/supabase';
 
 interface ProductFormProps {
   initialProduct?: Product;
@@ -207,27 +209,39 @@ export default function ProductForm({ initialProduct, isEditing = false }: Produ
         colors: colors.length > 0 ? colors : undefined,
       };
 
+      let savedProduct: Product | null = null;
+      if (isSupabaseConfigured) {
+        if (isEditing && initialProduct) {
+          savedProduct = await updateProductInDb(initialProduct.id, productPayload);
+        } else {
+          savedProduct = await createProductInDb(productPayload);
+        }
+      }
+
       if (isEditing && initialProduct) {
-        updateProduct(initialProduct.id, productPayload);
-        setToastMessage('Producto guardado correctamente');
+        const finalProduct = savedProduct || { ...productPayload, id: initialProduct.id };
+        updateProduct(initialProduct.id, finalProduct);
+        setToastMessage('Producto actualizado correctamente en Supabase');
         setIsSubmitting(false);
         // Scroll to top to see message
         window.scrollTo({ top: 0, behavior: 'smooth' });
         setTimeout(() => {
           router.push('/admin/productos');
-        }, 1200);
+        }, 1000);
       } else {
-        addProduct(productPayload);
-        setToastMessage('Producto creado exitosamente');
+        const finalProduct = savedProduct || { ...productPayload, id: `prod-${Date.now()}` };
+        addProduct(finalProduct);
+        setToastMessage('Producto creado correctamente en Supabase');
         setIsSubmitting(false);
         setTimeout(() => {
           router.push('/admin/productos');
         }, 1000);
       }
     } catch (err: any) {
-      console.error('Error saving product:', err);
+      console.error('[PRODUCT SAVE ERROR]', err);
       setFormError(err.message || 'Ocurrió un error al guardar el producto.');
       setIsSubmitting(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 

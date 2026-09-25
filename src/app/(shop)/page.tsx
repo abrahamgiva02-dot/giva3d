@@ -1,14 +1,42 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import BannerCarousel from '@/components/home/BannerCarousel';
 import CategoryGrid from '@/components/home/CategoryGrid';
 import CustomServiceBanner from '@/components/home/CustomServiceBanner';
 import ProductSection from '@/components/home/ProductSection';
 import { useCatalogStore } from '@/lib/store/catalog-store';
+import { fetchActiveProducts } from '@/lib/services/products';
+import { isSupabaseConfigured } from '@/lib/supabase';
 
 export default function HomePage() {
-  const { products } = useCatalogStore();
+  const { products, setProducts } = useCatalogStore();
+  const [isLoadingProducts, setIsLoadingProducts] = useState(isSupabaseConfigured);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (isSupabaseConfigured) {
+      fetchActiveProducts()
+        .then((dbItems) => {
+          if (isMounted) {
+            if (dbItems && dbItems.length > 0) {
+              setProducts(dbItems);
+            }
+            setIsLoadingProducts(false);
+          }
+        })
+        .catch((err) => {
+          console.error('[SUPABASE PRODUCTS ERROR] Failed to load home products:', err);
+          if (isMounted) {
+            setIsLoadingProducts(false);
+          }
+        });
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [setProducts]);
 
   // Filter only active products for the public catalog
   const activeProducts = products.filter((p) => p.isActive);

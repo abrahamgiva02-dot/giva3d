@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ChevronRight, Wrench, MessageCircle, SlidersHorizontal, Layers, CheckCircle2, ArrowRight } from 'lucide-react';
@@ -8,14 +8,34 @@ import { useCatalogStore } from '@/lib/store/catalog-store';
 import ProductCard from '@/components/product/ProductCard';
 import { buildWhatsAppCustomQuoteUrl } from '@/lib/config';
 import { normalizeSlug, slugify } from '@/lib/slug';
+import { fetchActiveProducts } from '@/lib/services/products';
+import { isSupabaseConfigured } from '@/lib/supabase';
 
 export default function CategoryPage() {
   const params = useParams();
   const rawSlug = params?.slug as string;
   const slug = normalizeSlug(rawSlug);
 
-  const { categories, products } = useCatalogStore();
+  const { categories, products, setProducts } = useCatalogStore();
   const [sortBy, setSortBy] = useState<'default' | 'price-asc' | 'price-desc' | 'name'>('default');
+
+  useEffect(() => {
+    let isMounted = true;
+    if (isSupabaseConfigured) {
+      fetchActiveProducts()
+        .then((dbItems) => {
+          if (isMounted && dbItems && dbItems.length > 0) {
+            setProducts(dbItems);
+          }
+        })
+        .catch((err) => {
+          console.error('[SUPABASE PRODUCTS ERROR] Category page fetch error:', err);
+        });
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [setProducts]);
 
   const category = useMemo(() => {
     return categories.find((c) => slugify(c.slug) === slug || c.slug === slug || c.slug === rawSlug);

@@ -2,6 +2,9 @@ import React from 'react';
 import Header from '@/components/common/Header';
 import Footer from '@/components/common/Footer';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export default function ShopLayout({
   children,
 }: {
